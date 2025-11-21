@@ -1,1 +1,1 @@
-# OSHA-Data-visualizer
+We are Zach Ingram, Nathan Landis, and Jacob Chattin and we are Construction Management Majors at the University of Florida. We wanted to create an AI model that could visualize OSHA incidents and would be easily able to find common issues. This goal is to improve our jobsites by giving us the ability to know what issues we should look for and can aim to prevent. By having the statistics easily available, we can prepare for and, hopefully, prevent accidents and ensure the safety of our site.# OSHA-Data-visualizer
