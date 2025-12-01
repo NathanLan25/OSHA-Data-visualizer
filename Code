@@ -1,0 +1,62 @@
+import pandas as pd
+from google.colab import drive
+
+#Mount Google Drive
+drive.mount('/content/drive')
+
+#Define file path and load dataset
+file_path = '/content/drive/My Drive/OSHA_data_15_17_with_hazard_labels.csv'
+try:
+    df = pd.read_csv(file_path)
+    print(f"\nSuccessfully loaded data from {file_path}. Shape: {df.shape}")
+except FileNotFoundError:
+    print(f"Error: The file '{file_path}' was not found. Please check the path and ensure your Drive is mounted correctly.")
+    df = None #Set df to None to prevent further errors if file not found
+
+if df is not None:
+    #Calculate value counts for 'hazard_class'
+    hazard_class_column_name = 'hazard_class'
+    if hazard_class_column_name in df.columns:
+        hazard_class_counts = df[hazard_class_column_name].value_counts()
+        print(f"\nTotal amount of each hazard class ({hazard_class_column_name}):")
+        display(hazard_class_counts)
+    else:
+        print(f"Error: Column '{hazard_class_column_name}' not found.")
+
+    #Calculate value counts for 'Degree of Injury'
+    degree_of_injury_column = 'Degree of Injury'
+    if degree_of_injury_column in df.columns:
+        degree_of_injury_counts = df[degree_of_injury_column].value_counts()
+        print(f"\nTotal amount of each '{degree_of_injury_column}':")
+        display(degree_of_injury_counts)
+    else:
+        print(f"Error: Column '{degree_of_injury_column}' not found.")
+
+    #Calculate value counts for 'Nature of Injury'
+    nature_of_injury_column = 'Nature of Injury'
+    if nature_of_injury_column in df.columns:
+        nature_of_injury_counts = df[nature_of_injury_column].value_counts()
+        print(f"\nTotal amount of each '{nature_of_injury_column}':")
+        display(nature_of_injury_counts)
+    else:
+        print(f"Error: Column '{nature_of_injury_column}' not found.")
+
+    #Calculate value counts for 'Part of Body'
+    part_of_body_column = 'Part of Body'
+    if part_of_body_column in df.columns:
+        part_of_body_counts = df[part_of_body_column].value_counts()
+        print(f"\nTotal amount of each '{part_of_body_column}':")
+        display(part_of_body_counts)
+    else:
+        print(f"Error: Column '{part_of_body_column}' not found.")
+
+    #Calculate value counts for 'Event type'
+    event_type_column = 'Event type'
+    if event_type_column in df.columns:
+        event_type_counts = df[event_type_column].value_counts()
+        print(f"\nTotal amount of each '{event_type_column}':")
+        display(event_type_counts)
+    else:
+        print(f"Error: Column '{event_type_column}' not found.")
+else:
+    print("Cannot perform categorizations as the DataFrame was not loaded.")
