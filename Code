@@ -61,3 +61,402 @@ if df is not None:
 else:
     print("Cannot perform categorizations as the DataFrame was not loaded.")
 
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
+from google.colab import drive
+
+# Mount Drive
+drive.mount('/content/drive')
+
+file_path = '/content/drive/My Drive/OSHA_data_15_17_with_hazard_labels.csv'
+try:
+    df = pd.read_csv(file_path)
+    print(f"\nSuccessfully loaded data from {file_path}. Shape: {df.shape}")
+except FileNotFoundError:
+    print(f"Error: The file '{file_path}' was not found. Please check the path and ensure your Drive is mounted correctly.")
+    df = None
+
+if df is not None:
+    
+
+    # fatalities
+    if 'Degree of Injury' in df.columns:
+        df['fatality'] = df['Degree of Injury'].apply(lambda x: 1 if x == 'Fatal' else 0)
+        
+    else:
+        print("Error: 'Degree of Injury' column missing. Cannot create 'fatality' column.")
+        df = None # Mark df as unusable if essential column is missing
+
+    if df is not None and 'fatality' in df.columns and 'Event type' in df.columns and 'Part of Body' in df.columns:
+        
+        df_analysis = df[['fatality', 'Event type', 'Part of Body']].copy()
+        # print("\nNew DataFrame 'df_analysis' created with 'fatality', 'Event type', and 'Part of Body' columns.") # Reduced output
+
+        
+        df_analysis.dropna(subset=['Event type', 'Part of Body'], inplace=True)
+
+        
+        df_analysis_encoded = pd.get_dummies(df_analysis, columns=['Event type', 'Part of Body'], drop_first=True)
+
+        
+        X = df_analysis_encoded.drop('fatality', axis=1)
+        y = df_analysis_encoded['fatality']
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+        log_reg_model = LogisticRegression(solver='liblinear', random_state=42)
+        log_reg_model.fit(X_train, y_train)
+
+        y_pred = log_reg_model.predict(X_test)
+
+        
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred, zero_division=0)
+        recall = recall_score(y_test, y_pred, zero_division=0)
+        f1 = f1_score(y_test, y_pred, zero_division=0)
+
+        print(f"\nModel Evaluation Metrics (Fatality Prediction):")
+        print(f"Accuracy: {accuracy:.4f}")
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall: {recall:.4f}")
+        print(f"F1-Score: {f1:.4f}")
+
+        print("\nClassification Report (Fatality Prediction):")
+        print(classification_report(y_test, y_pred, zero_division=0))
+
+        print("\nConfusion Matrix (Fatality Prediction):")
+        print(confusion_matrix(y_test, y_pred))
+
+        
+        coefficients = log_reg_model.coef_[0]
+        feature_coefficients = pd.Series(coefficients, index=X.columns)
+        sorted_coefficients_desc = feature_coefficients.sort_values(ascending=False)
+        sorted_coefficients_asc = feature_coefficients.sort_values(ascending=True)
+
+        event_type_part_of_body_desc = sorted_coefficients_desc[
+            sorted_coefficients_desc.index.str.startswith('Event type_') |
+            sorted_coefficients_desc.index.str.startswith('Part of Body_')
+        ]
+        event_type_part_of_body_asc = sorted_coefficients_asc[
+            sorted_coefficients_asc.index.str.startswith('Event type_') |
+            sorted_coefficients_asc.index.str.startswith('Part of Body_')
+        ]
+
+        print("\nTop 10 'Event type' and 'Part of Body' combinations most indicative of fatality (positive coefficients):")
+        display(event_type_part_of_body_desc.head(10))
+
+        print("\nTop 10 'Event type' and 'Part of Body' combinations least indicative of fatality (negative coefficients):")
+        display(event_type_part_of_body_asc.head(10))
+
+    else:
+        print("Error: Cannot perform fatality prediction tasks as required columns are missing or DataFrame is not loaded.")
+
+    # Part of body prediction
+
+    if 'Part of Body' in df.columns and 'Degree of Injury' in df.columns and 'Event type' in df.columns:
+        
+        df_part_of_body_analysis = df[['Part of Body', 'Degree of Injury', 'Event type']].copy()
+
+        df_part_of_body_analysis.dropna(subset=['Part of Body', 'Degree of Injury', 'Event type'], inplace=True)
+
+        
+        df_part_of_body_encoded = pd.get_dummies(df_part_of_body_analysis, columns=['Degree of Injury', 'Event type'], drop_first=True)
+
+      
+        X_part_of_body = df_part_of_body_encoded.drop('Part of Body', axis=1)
+        y_part_of_body = df_part_of_body_encoded['Part of Body']
+
+      
+        X_part_of_body_train, X_part_of_body_test, y_part_of_body_train, y_part_of_body_test = train_test_split(X_part_of_body, y_part_of_body, test_size=0.2, random_state=42, stratify=y_part_of_body)
+
+        
+        rf_model_part_of_body = RandomForestClassifier(random_state=42)
+        rf_model_part_of_body.fit(X_part_of_body_train, y_part_of_body_train)
+
+        
+        y_pred_part_of_body = rf_model_part_of_body.predict(X_part_of_body_test)
+
+       
+        accuracy_pob = accuracy_score(y_part_of_body_test, y_pred_part_of_body)
+        precision_pob = precision_score(y_part_of_body_test, y_pred_part_of_body, average='weighted', zero_division=0)
+        recall_pob = recall_score(y_part_of_body_test, y_pred_part_of_body, average='weighted', zero_division=0)
+        f1_pob = f1_score(y_part_of_body_test, y_pred_part_of_body, average='weighted', zero_division=0)
+
+        print(f"\n'Part of Body' Model Evaluation Metrics:")
+        print(f"Accuracy: {accuracy_pob:.4f}")
+        print(f"Precision: {precision_pob:.4f}")
+        print(f"Recall: {recall_pob:.4f}")
+        print(f"F1-Score: {f1_pob:.4f}")
+
+        print("\n'Part of Body' Model Classification Report:")
+        print(classification_report(y_part_of_body_test, y_pred_part_of_body, zero_division=0))
+
+        print("\n'Part of Body' Model Confusion Matrix:")
+        print(confusion_matrix(y_part_of_body_test, y_pred_part_of_body))
+    else:
+        print("Error: Cannot perform Part of Body prediction tasks as required columns are missing or DataFrame is not loaded.")
+else:
+    print("Cannot proceed with any analysis as the initial DataFrame was not loaded.")
+
+OUTPUT
+
+ Drive already mounted at /content/drive; to attempt to forcibly remount, call drive.mount("/content/drive", force_remount=True).
+
+Successfully loaded data from /content/drive/My Drive/OSHA_data_15_17_with_hazard_labels.csv. Shape: (4847, 30)
+
+Model Evaluation Metrics (Fatality Prediction):
+Accuracy: 0.8627
+Precision: 0.8560
+Recall: 0.9325
+F1-Score: 0.8927
+
+Classification Report (Fatality Prediction):
+              precision    recall  f1-score   support
+
+           0       0.88      0.75      0.81       376
+           1       0.86      0.93      0.89       593
+
+    accuracy                           0.86       969
+   macro avg       0.87      0.84      0.85       969
+weighted avg       0.86      0.86      0.86       969
+
+
+Confusion Matrix (Fatality Prediction):
+[[283  93]
+ [ 40 553]]
+
+Top 10 'Event type' and 'Part of Body' combinations most indicative of fatality (positive coefficients):
+
+
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+
+
+  
+    
+      
+      0
+    
+  
+  
+    
+      Part of Body_Whole Body
+      2.724998
+    
+    
+      Part of Body_Head
+      2.264031
+    
+    
+      Part of Body_Internal Injuries
+      1.955925
+    
+    
+      Event type_Shock
+      1.905445
+    
+    
+      Part of Body_Heart
+      1.797733
+    
+    
+      Part of Body_Neck
+      1.758042
+    
+    
+      Event type_Card-vascular/resp. fail.
+      1.708525
+    
+    
+      Part of Body_Abdomen
+      1.403775
+    
+    
+      Part of Body_Ribs
+      1.366509
+    
+    
+      Part of Body_Lungs (Puncture)
+      0.959869
+    
+  
+
+dtype: float64
+Top 10 'Event type' and 'Part of Body' combinations least indicative of fatality (negative coefficients):
+
+
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+
+
+  
+    
+      
+      0
+    
+  
+  
+    
+      Part of Body_Fingers
+      -4.527797
+    
+    
+      Part of Body_Hand
+      -2.096223
+    
+    
+      Part of Body_Feet
+      -1.978498
+    
+    
+      Part of Body_Wrist
+      -1.351287
+    
+    
+      Part of Body_Forearm
+      -1.193785
+    
+    
+      Event type_Fall (same level)
+      -1.192886
+    
+    
+      Part of Body_Arm
+      -1.159369
+    
+    
+      Part of Body_Left Leg
+      -1.047027
+    
+    
+      Part of Body_Knee
+      -1.033510
+    
+    
+      Part of Body_Right Eye
+      -1.030174
+    
+  
+
+dtype: float64
+'Part of Body' Model Evaluation Metrics:
+Accuracy: 0.3880
+Precision: 0.2619
+Recall: 0.3880
+F1-Score: 0.2933
+
+'Part of Body' Model Classification Report:
+                      precision    recall  f1-score   support
+
+                   0       0.00      0.00      0.00         3
+             Abdomen       0.00      0.00      0.00        16
+                 Arm       0.00      0.00      0.00        14
+                Back       0.00      0.00      0.00        17
+               Elbow       0.00      0.00      0.00         1
+                Face       0.00      0.00      0.00        15
+                Feet       0.00      0.00      0.00        25
+               Femur       0.00      0.00      0.00         5
+             Fingers       0.49      0.89      0.64       110
+             Forearm       0.00      0.00      0.00         5
+                Hand       0.38      0.07      0.12        42
+                Head       0.40      0.82      0.54       205
+               Heart       0.38      0.57      0.46        75
+                 Hip       0.14      0.23      0.18        13
+   Internal Injuries       0.00      0.00      0.00        81
+                Knee       0.00      0.00      0.00         5
+            Left Leg       0.26      0.29      0.27        55
+               Liver       0.00      0.00      0.00         2
+           Lower Leg       0.00      0.00      0.00        13
+Lungs (Asphyxiation)       0.00      0.00      0.00         4
+    Lungs (Puncture)       0.37      0.33      0.35        21
+            Multiple       0.00      0.00      0.00         5
+                Neck       0.00      0.00      0.00        32
+                Ribs       0.30      0.41      0.35        61
+           Right Eye       0.00      0.00      0.00         3
+            Shoulder       0.00      0.00      0.00        20
+          Whole Body       0.27      0.12      0.16       111
+               Wrist       0.00      0.00      0.00        10
+
+            accuracy                           0.39       969
+           macro avg       0.11      0.13      0.11       969
+        weighted avg       0.26      0.39      0.29       969
+
+
+'Part of Body' Model Confusion Matrix:
+[[  0   0   0   0   0   0   0   0   0   0   0   1   1   1   0   0   0   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   1   0   0  10   0   0   0   0   0   0
+    0   0   0   0   0   4   0   0   1   0]
+ [  0   0   0   0   0   0   0   0  10   0   0   0   0   0   0   0   1   0
+    0   0   0   0   0   0   0   0   3   0]
+ [  0   0   0   0   0   0   0   0   1   0   0  11   0   1   0   0   3   0
+    0   0   0   0   0   1   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   0   0   0   1   0   0   0   0   0   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   1   0   0   8   0   1   0   0   5   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   1   0   0   0   0   0   7   0   0   8   0   1   0   0   7   0
+    0   0   0   0   0   1   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   0   0   0   3   0   1   0   0   0   0
+    0   0   0   0   0   1   0   0   0   0]
+ [  0   0   0   0   0   0   0   0  98   0   0   1   0   0   0   0  11   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   3   0   1   1   0   0   0   0   0   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0  22   0   3   2   0   0   0   0   2   0
+    0   0   0   0   0   0   0   0  13   0]
+ [  0   0   0   0   0   0   0   0   5   0   0 168   9   4   0   0   3   0
+    0   0   0   0   0  12   0   0   4   0]
+ [  0   0   0   0   0   0   0   0   3   0   0  19  43   0   0   0   1   0
+    0   0   2   0   0   4   0   0   3   0]
+ [  0   0   0   0   0   0   0   0   2   0   0   5   0   3   0   0   3   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   5   0   1  45  12   0   0   0   1   0
+    0   0   0   0   0  14   0   0   3   0]
+ [  0   0   0   0   0   0   0   0   0   0   1   3   0   0   0   0   0   0
+    0   0   0   0   0   0   0   0   1   0]
+ [  0   0   0   0   0   0   0   0  17   0   0  18   0   3   0   0  16   0
+    0   0   0   0   0   1   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   1   0   0   1   0   0   0   0   0   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   2   0   0   7   0   4   0   0   0   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   1   0   0   0   1   0   0   0   0   0
+    0   0   2   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   1   0   0   8   2   0   0   0   0   0
+    0   0   7   0   0   1   0   0   2   0]
+ [  0   0   0   0   0   0   0   0   3   0   0   2   0   0   0   0   0   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   0   0   0  22   1   1   0   0   1   0
+    0   0   0   0   0   7   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   4   0   0  17  10   0   0   0   3   0
+    0   0   0   0   0  25   0   0   2   0]
+ [  0   0   0   0   0   0   0   0   2   0   0   1   0   0   0   0   0   0
+    0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   0   0   0   0   0   3   0   1  11   0   0   0   0   2   0
+    0   0   0   0   0   0   0   0   3   0]
+ [  0   0   0   0   0   0   0   0   3   0   0  39  34   0   0   0   3   0
+    0   0   8   0   0  11   0   0  13   0]
+ [  0   0   0   0   0   0   0   0   3   0   1   5   0   1   0   0   0   0
+    0   0   0   0   0   0   0   0   0   0]]
