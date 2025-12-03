@@ -60,3 +60,149 @@ if df is not None:
         print(f"Error: Column '{event_type_column}' not found.")
 else:
     print("Cannot perform categorizations as the DataFrame was not loaded.")
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
+from google.colab import drive
+
+# Mount Google Drive
+drive.mount('/content/drive')
+
+# Define file path and load dataset
+file_path = '/content/drive/My Drive/OSHA_data_15_17_with_hazard_labels.csv'
+try:
+    df = pd.read_csv(file_path)
+    print(f"\nSuccessfully loaded data from {file_path}. Shape: {df.shape}")
+except FileNotFoundError:
+    print(f"Error: The file '{file_path}' was not found. Please check the path and ensure your Drive is mounted correctly.")
+    df = None
+
+if df is not None:
+    
+
+    # Step 1: Create 'fatality' column
+    if 'Degree of Injury' in df.columns:
+        df['fatality'] = df['Degree of Injury'].apply(lambda x: 1 if x == 'Fatal' else 0)
+        # print("\n'fatality' column created successfully.") # Reduced output
+        # display(df['fatality'].value_counts()) # Reduced output
+    else:
+        print("Error: 'Degree of Injury' column missing. Cannot create 'fatality' column.")
+        df = None # Mark df as unusable if essential column is missing
+
+    if df is not None and 'fatality' in df.columns and 'Event type' in df.columns and 'Part of Body' in df.columns:
+        # Step 2: Create df_analysis with relevant columns
+        df_analysis = df[['fatality', 'Event type', 'Part of Body']].copy()
+        # print("\nNew DataFrame 'df_analysis' created with 'fatality', 'Event type', and 'Part of Body' columns.") # Reduced output
+
+        # Step 3: Handle missing values
+        df_analysis.dropna(subset=['Event type', 'Part of Body'], inplace=True)
+
+        # Step 4: One-hot encode categorical features
+        df_analysis_encoded = pd.get_dummies(df_analysis, columns=['Event type', 'Part of Body'], drop_first=True)
+
+        # Step 5: Separate features (X) and target (y) for fatality prediction
+        X = df_analysis_encoded.drop('fatality', axis=1)
+        y = df_analysis_encoded['fatality']
+
+        # Step 6: Split data into training and testing sets for fatality prediction
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+        # Step 7: Train Logistic Regression model for fatality prediction
+        log_reg_model = LogisticRegression(solver='liblinear', random_state=42)
+        log_reg_model.fit(X_train, y_train)
+
+        # Step 8: Make predictions on the test set for fatality prediction
+        y_pred = log_reg_model.predict(X_test)
+
+        # Step 9: Evaluate Fatality Prediction Model
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred, zero_division=0)
+        recall = recall_score(y_test, y_pred, zero_division=0)
+        f1 = f1_score(y_test, y_pred, zero_division=0)
+
+        print(f"\nModel Evaluation Metrics (Fatality Prediction):")
+        print(f"Accuracy: {accuracy:.4f}")
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall: {recall:.4f}")
+        print(f"F1-Score: {f1:.4f}")
+
+        print("\nClassification Report (Fatality Prediction):")
+        print(classification_report(y_test, y_pred, zero_division=0))
+
+        print("\nConfusion Matrix (Fatality Prediction):")
+        print(confusion_matrix(y_test, y_pred))
+
+        # Step 10: Analyze coefficients for fatality prediction
+        coefficients = log_reg_model.coef_[0]
+        feature_coefficients = pd.Series(coefficients, index=X.columns)
+        sorted_coefficients_desc = feature_coefficients.sort_values(ascending=False)
+        sorted_coefficients_asc = feature_coefficients.sort_values(ascending=True)
+
+        event_type_part_of_body_desc = sorted_coefficients_desc[
+            sorted_coefficients_desc.index.str.startswith('Event type_') |
+            sorted_coefficients_desc.index.str.startswith('Part of Body_')
+        ]
+        event_type_part_of_body_asc = sorted_coefficients_asc[
+            sorted_coefficients_asc.index.str.startswith('Event type_') |
+            sorted_coefficients_asc.index.str.startswith('Part of Body_')
+        ]
+
+        print("\nTop 10 'Event type' and 'Part of Body' combinations most indicative of fatality (positive coefficients):")
+        display(event_type_part_of_body_desc.head(10))
+
+        print("\nTop 10 'Event type' and 'Part of Body' combinations least indicative of fatality (negative coefficients):")
+        display(event_type_part_of_body_asc.head(10))
+
+    else:
+        print("Error: Cannot perform fatality prediction tasks as required columns are missing or DataFrame is not loaded.")
+
+    # --- Part of Body Prediction Task --- #
+
+    if 'Part of Body' in df.columns and 'Degree of Injury' in df.columns and 'Event type' in df.columns:
+        # Step 11: Create new DataFrame for Part of Body prediction
+        df_part_of_body_analysis = df[['Part of Body', 'Degree of Injury', 'Event type']].copy()
+
+        # Step 12: Handle missing values for Part of Body prediction
+        df_part_of_body_analysis.dropna(subset=['Part of Body', 'Degree of Injury', 'Event type'], inplace=True)
+
+        # Step 13: Apply one-hot encoding for Part of Body prediction
+        df_part_of_body_encoded = pd.get_dummies(df_part_of_body_analysis, columns=['Degree of Injury', 'Event type'], drop_first=True)
+
+        # Step 14: Separate features (X_part_of_body) and target (y_part_of_body)
+        X_part_of_body = df_part_of_body_encoded.drop('Part of Body', axis=1)
+        y_part_of_body = df_part_of_body_encoded['Part of Body']
+
+        # Step 15: Split data into training and testing sets for Part of Body prediction
+        X_part_of_body_train, X_part_of_body_test, y_part_of_body_train, y_part_of_body_test = train_test_split(X_part_of_body, y_part_of_body, test_size=0.2, random_state=42, stratify=y_part_of_body)
+
+        # Step 16: Train RandomForestClassifier model for Part of Body prediction
+        rf_model_part_of_body = RandomForestClassifier(random_state=42)
+        rf_model_part_of_body.fit(X_part_of_body_train, y_part_of_body_train)
+
+        # Step 17: Make predictions for Part of Body
+        y_pred_part_of_body = rf_model_part_of_body.predict(X_part_of_body_test)
+
+        # Step 18: Evaluate Part of Body Prediction Model
+        accuracy_pob = accuracy_score(y_part_of_body_test, y_pred_part_of_body)
+        precision_pob = precision_score(y_part_of_body_test, y_pred_part_of_body, average='weighted', zero_division=0)
+        recall_pob = recall_score(y_part_of_body_test, y_pred_part_of_body, average='weighted', zero_division=0)
+        f1_pob = f1_score(y_part_of_body_test, y_pred_part_of_body, average='weighted', zero_division=0)
+
+        print(f"\n'Part of Body' Model Evaluation Metrics:")
+        print(f"Accuracy: {accuracy_pob:.4f}")
+        print(f"Precision: {precision_pob:.4f}")
+        print(f"Recall: {recall_pob:.4f}")
+        print(f"F1-Score: {f1_pob:.4f}")
+
+        print("\n'Part of Body' Model Classification Report:")
+        print(classification_report(y_part_of_body_test, y_pred_part_of_body, zero_division=0))
+
+        print("\n'Part of Body' Model Confusion Matrix:")
+        print(confusion_matrix(y_part_of_body_test, y_pred_part_of_body))
+    else:
+        print("Error: Cannot perform Part of Body prediction tasks as required columns are missing or DataFrame is not loaded.")
+else:
+    print("Cannot proceed with any analysis as the initial DataFrame was not loaded.")
